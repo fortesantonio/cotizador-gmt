@@ -1,0 +1,1252 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Cotizador">
+<meta name="theme-color" content="#7a4a24">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<title>Cotizador GMT</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<style>
+  :root {
+    --wood: #7a4a24;
+    --wood-light: #f4ebe1;
+    --bg: #f6f4f1;
+    --card: #ffffff;
+    --text: #1f1b16;
+    --muted: #6b645c;
+    --border: #e2ddd6;
+    --green: #2f7a3a;
+    --red: #b3261e;
+    --radius: 12px;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    -webkit-text-size-adjust: 100%;
+  }
+  #app {
+    max-width: 560px;
+    margin: 0 auto;
+    padding: calc(env(safe-area-inset-top) + 12px) 16px calc(env(safe-area-inset-bottom) + 32px);
+  }
+  button { font: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+
+  /* Top bar */
+  .topbar { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; }
+  .topbar h1 { font-size: 20px; margin: 0; font-weight: 600; flex: 1; }
+  .icon-btn {
+    border: 1px solid var(--border); background: var(--card); color: var(--text);
+    border-radius: 10px; min-width: 44px; height: 44px; font-size: 20px; padding: 0 10px;
+  }
+  .badge {
+    background: var(--wood-light); color: var(--wood); font-size: 13px; font-weight: 600;
+    padding: 4px 10px; border-radius: 20px;
+  }
+
+  /* Cards and layout */
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 14px; margin-bottom: 12px;
+  }
+  .hero { text-align: center; padding: 26px 14px; }
+  .hero h2 { margin: 0; font-size: 19px; }
+  .logo-img { width: 90px; height: 90px; object-fit: contain; margin: 0 auto 10px; display: block; }
+  .logo-ph {
+    width: 84px; height: 84px; border-radius: 50%; background: var(--wood-light); color: var(--wood);
+    display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 26px;
+    margin: 0 auto 10px;
+  }
+  .section-title {
+    font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase;
+    letter-spacing: .05em; margin: 20px 0 8px;
+  }
+  .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .muted { color: var(--muted); font-size: 13px; }
+  .pos { color: var(--green); }
+  .neg { color: var(--red); }
+  .empty { text-align: center; color: var(--muted); padding: 34px 10px; }
+
+  /* Buttons */
+  .big-btn {
+    display: flex; align-items: center; gap: 12px; width: 100%; padding: 18px 16px;
+    font-size: 18px; font-weight: 500; text-align: left;
+    border-radius: var(--radius); border: 1px solid var(--border);
+    background: var(--card); color: var(--text); margin-bottom: 10px;
+  }
+  .big-btn.primary { background: var(--wood); border-color: var(--wood); color: #fff; }
+  .big-btn .ic { font-size: 24px; width: 30px; text-align: center; }
+  .btn {
+    padding: 12px 14px; border-radius: 10px; border: 1px solid var(--border);
+    background: var(--card); color: var(--text); font-size: 16px; width: 100%;
+  }
+  .btn.primary { background: var(--wood); border-color: var(--wood); color: #fff; font-weight: 600; }
+  .btn.danger { color: var(--red); }
+  .btn.small { padding: 9px 10px; font-size: 15px; }
+  .btn-stack > * { margin-top: 8px; }
+
+  /* Forms */
+  label { display: block; font-size: 13px; color: var(--muted); margin: 10px 0 4px; }
+  input, textarea {
+    width: 100%; font-size: 16px; padding: 10px; font-family: inherit;
+    border: 1px solid var(--border); border-radius: 10px; background: #fff; color: var(--text);
+  }
+  textarea { resize: vertical; min-height: 46px; }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  input:focus, textarea:focus { outline: 2px solid var(--wood); outline-offset: -1px; }
+
+  /* Items */
+  .item-head { display: flex; justify-content: space-between; align-items: center; }
+  .item-num { font-weight: 600; color: var(--wood); }
+    .del-btn { border: none; background: none; color: var(--red); font-size: 15px; padding: 6px; }
+  .mode-row { display: flex; gap: 8px; align-items: center; }
+  .mode-row input { flex: 1; min-width: 0; }
+  .seg { display: flex; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; flex-shrink: 0; }
+  .seg button { border: none; background: var(--card); color: var(--text); font-size: 16px; padding: 10px 14px; }
+  .seg button.on { background: var(--wood); color: #fff; font-weight: 600; }
+  .row { display: flex; justify-content: space-between; gap: 10px; padding: 4px 0; font-size: 15px; }
+  .row.total { font-weight: 700; font-size: 19px; border-top: 1px solid var(--border); margin-top: 6px; padding-top: 10px; }
+  .metric { background: var(--wood-light); border-radius: 10px; padding: 10px 12px; }
+  .metric .l { font-size: 12px; color: var(--muted); }
+  .metric .v { font-size: 18px; font-weight: 600; margin-top: 2px; }
+
+  /* Toast */
+  #toast {
+    position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 24px);
+    transform: translateX(-50%); background: #222; color: #fff; padding: 11px 18px;
+    border-radius: 22px; font-size: 15px; opacity: 0; transition: opacity .2s;
+    pointer-events: none; max-width: 90%; text-align: center; z-index: 10;
+  }
+  #toast.show { opacity: 1; }
+
+  /* Edit banner and choice dialog */
+  .edit-banner { background: var(--wood-light); border-color: var(--wood-light); font-size: 15px; }
+  .modal-bg {
+    position: fixed; inset: 0; background: rgba(0, 0, 0, .45); z-index: 20;
+    display: flex; align-items: center; justify-content: center; padding: 20px;
+  }
+  .modal { background: var(--card); border-radius: 16px; padding: 18px; width: 100%; max-width: 400px; }
+  .modal h3 { margin: 0 0 6px; font-size: 18px; }
+  .modal p { margin: 0 0 10px; color: var(--muted); font-size: 15px; }
+  .modal .btn { margin-top: 8px; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="toast"></div>
+<div id="modal"></div>
+
+<script>
+'use strict';
+
+/* =========================================================
+   CONSTANTS
+   ========================================================= */
+const DB_NAME = 'cotizador-gmt';
+const DB_VERSION = 1;
+const IVA_RATE = 0.16;
+const MONTHS = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio',
+  'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+
+/* Company logo, built in. Configuración can replace it. */
+const DEFAULT_LOGO = 'data:image/jpeg;base64,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';
+
+
+const DEFAULT_SETTINGS = {
+  companyName: 'Grupo MT Fortes Hermanos, S.A. de C.V.',
+  signer: 'Victor Manuel Fortes Lucio',
+  city: 'CDMX',
+  intro: 'De acuerdo a tu solicitud de cotización pongo a tu fina consideración el siguiente material:',
+  deliveryTime: 'Inmediata',
+  paymentTerms: 'Depósito electrónico a nuestra cuenta',
+  closing: 'Sin otro particular espero su resolución.',
+  bankName: '',
+  account: '',
+  branch: '',
+  clabe: '',
+  accountName: '',
+  nextNumber: 1001,
+  logo: ''
+};
+
+/* =========================================================
+   DATABASE (IndexedDB)
+   Stores: "kv" (settings, draft) and "quotes" (saved quotes)
+   ========================================================= */
+let db;
+
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = () => {
+      const d = req.result;
+      if (!d.objectStoreNames.contains('kv')) d.createObjectStore('kv');
+      if (!d.objectStoreNames.contains('quotes')) d.createObjectStore('quotes', { keyPath: 'id' });
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function tx(storeName, mode, fn) {
+  return new Promise((resolve, reject) => {
+    const t = db.transaction(storeName, mode);
+    const req = fn(t.objectStore(storeName));
+    t.oncomplete = () => resolve(req ? req.result : undefined);
+    t.onerror = () => reject(t.error);
+  });
+}
+
+const kvGet = (key) => tx('kv', 'readonly', (s) => s.get(key));
+const kvSet = (key, val) => tx('kv', 'readwrite', (s) => s.put(val, key));
+const quotesGetAll = () => tx('quotes', 'readonly', (s) => s.getAll());
+const quotePut = (q) => tx('quotes', 'readwrite', (s) => s.put(q));
+const quoteDelete = (id) => tx('quotes', 'readwrite', (s) => s.delete(id));
+
+/* =========================================================
+   STATE
+   ========================================================= */
+const state = {
+  screen: 'home',
+  settings: { ...DEFAULT_SETTINGS },
+  draft: null,
+  quotes: []
+};
+
+function newItem() {
+  return { qty: '', desc: '', measures: '', cost: '', price: '', mode: '$', pct: '' };
+}
+
+function newDraft() {
+  return {
+    id: null, number: null, date: todayISO(),
+    client: '', attn: '', site: '', address: '', email: '',
+    items: [newItem()],
+    createdAt: null, updatedAt: null
+  };
+}
+
+/* =========================================================
+   HELPERS
+   ========================================================= */
+const app = document.getElementById('app');
+const moneyFmt = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' });
+const qtyFmt = new Intl.NumberFormat('es-MX', { maximumFractionDigits: 2 });
+
+const money = (n) => moneyFmt.format(n || 0);
+const round2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
+const clone = (o) => JSON.parse(JSON.stringify(o));
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+
+function num(v) {
+  const n = parseFloat(String(v ?? '').replace(/,/g, ''));
+  return isFinite(n) ? n : 0;
+}
+
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, (c) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+/* Custom logo from Configuración, or the built-in one */
+function currentLogo() {
+  return state.settings.logo || DEFAULT_LOGO;
+}
+
+function logoFormat(dataUrl) {
+  return dataUrl.startsWith('data:image/jpeg') ? 'JPEG' : 'PNG';
+}
+
+function todayISO() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function longDate(iso) {
+  if (!iso) return '';
+  const [y, m, d] = iso.split('-').map(Number);
+  return `${d} de ${MONTHS[m - 1]} del ${y}`;
+}
+
+function shortDate(iso) {
+  if (!iso) return '';
+  const [y, m, d] = iso.split('-').map(Number);
+  return `${d} ${MONTHS[m - 1].slice(0, 3)} ${y}`;
+}
+
+let toastTimer;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2600);
+}
+
+function debounce(fn, ms) {
+  let t;
+  return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
+}
+
+const saveDraftSoon = debounce(() => kvSet('draft', state.draft).catch(console.error), 400);
+const saveSettingsSoon = debounce(() => {
+  kvSet('settings', state.settings)
+    .then(() => setSaveStatus('Guardado ✓'))
+    .catch((e) => { console.error(e); setSaveStatus('No se pudo guardar'); });
+}, 400);
+
+function setSaveStatus(text) {
+  const el = document.getElementById('save-status');
+  if (el) el.textContent = text;
+}
+
+function filledItems(items) {
+  return items.filter((it) => String(it.desc).trim() || num(it.qty));
+}
+
+function draftHasContent(d) {
+  return !!(d && (d.client.trim() || filledItems(d.items).length));
+}
+
+/* The parts of a quote that the user edits (used to detect unsaved changes) */
+function quoteContent(q) {
+  const { date, client, attn, site, address, email, items } = q;
+  return JSON.stringify({ date, client, attn, site, address, email, items });
+}
+
+/* True when a saved quote is open and has changes that were not saved */
+function hasUnsavedEdits() {
+  const d = state.draft;
+  if (!d || !d.id) return false;
+  const saved = state.quotes.find((q) => q.id === d.id);
+  return !saved || quoteContent(saved) !== quoteContent(d);
+}
+
+/* True when there is work that is not in Mis cotizaciones yet */
+function hasPendingWork() {
+  const d = state.draft;
+  if (!d) return false;
+  return d.id ? hasUnsavedEdits() : draftHasContent(d);
+}
+
+/* =========================================================
+   CALCULATIONS
+   Profit and margin are always BEFORE IVA.
+   ========================================================= */
+function lineTotal(it) { return num(it.qty) * num(it.price); }
+function lineCost(it) { return num(it.qty) * num(it.cost); }
+
+function calc(items) {
+  let sub = 0, cost = 0, hasCost = false;
+  for (const it of items) {
+    sub += lineTotal(it);
+    cost += lineCost(it);
+    if (num(it.cost) > 0) hasCost = true;
+  }
+  sub = round2(sub);
+  const iva = round2(sub * IVA_RATE);
+  const total = round2(sub + iva);
+  const profit = round2(sub - cost);
+  const margin = sub ? (profit / sub) * 100 : 0;
+  const markup = cost ? (profit / cost) * 100 : 0;
+  return { sub, iva, total, cost: round2(cost), profit, margin, markup, hasCost };
+}
+
+/* "% de ganancia" = over cost (markup): price = cost × (1 + % / 100) */
+function applyPct(it) {
+  if (it.mode !== '%') return;
+  const c = num(it.cost);
+  it.price = String(it.pct).trim() === '' || !c ? '' : String(round2(c * (1 + num(it.pct) / 100)));
+}
+
+function lineProfitText(it) {
+  const c = num(it.cost);
+  if (!c) return 'Escribe tu costo';
+  const p = num(it.qty) * (num(it.price) - c);
+  const pct = ((num(it.price) - c) / c) * 100;
+  return `${money(p)} · ${pct.toFixed(1)}%`;
+}
+
+function lineProfitClass(it) {
+  return num(it.price) < num(it.cost) ? 'neg' : 'pos';
+}
+
+/* =========================================================
+   RENDERING
+   ========================================================= */
+function render(keepScroll = false) {
+  const screens = {
+    home: renderHome,
+    estimate: renderEstimate,
+    quote: renderQuote,
+    history: renderHistory,
+    settings: renderSettings
+  };
+  const y = window.scrollY;
+  app.innerHTML = screens[state.screen]();
+  window.scrollTo(0, keepScroll ? y : 0);
+}
+
+function go(screen) {
+  state.screen = screen;
+  render();
+}
+
+function topbar(title, extra = '') {
+  return `
+    <div class="topbar">
+      <button class="icon-btn" data-action="back" aria-label="Inicio">‹</button>
+      <h1>${title}</h1>
+      ${extra}
+    </div>`;
+}
+
+/* ---------- Home ---------- */
+function renderHome() {
+  const s = state.settings;
+  const logo = `<img class="logo-img" src="${currentLogo()}" alt="Logo">`;
+  const firstName = (s.signer || '').trim().split(' ')[0];
+  const setupHint = !s.companyName.trim() ? `
+    <div class="card" style="background:var(--wood-light);border-color:var(--wood-light)">
+      <b>Primer paso:</b> llena los datos de tu empresa en <b>Configuración</b> para que aparezcan en tus cotizaciones.
+    </div>` : '';
+
+  return `
+    <div class="card hero">
+      ${logo}
+      <h2>${esc(s.companyName || 'Cotizador')}</h2>
+      <div class="muted" style="margin-top:4px">${firstName ? 'Hola, ' + esc(firstName) : 'Bienvenido'}</div>
+    </div>
+    ${setupHint}
+    ${continueCard()}
+    <button class="big-btn" data-action="start" data-to="estimate"><span class="ic">🧮</span>Estimar utilidad de pedido</button>
+    <button class="big-btn primary" data-action="start" data-to="quote"><span class="ic">📄</span>Generar cotización</button>
+    <button class="big-btn" data-action="go" data-to="history"><span class="ic">🗂️</span>Mis cotizaciones</button>
+    <button class="big-btn" data-action="go" data-to="settings"><span class="ic">⚙️</span>Configuración</button>
+  `;
+}
+
+function continueCard() {
+  if (!hasPendingWork()) return '';
+  const d = state.draft;
+  const text = d.id
+    ? `Tienes cambios sin guardar en la cotización <b>folio ${d.number}</b>.`
+    : `Tienes una cotización sin terminar${d.client.trim() ? ': <b>' + esc(d.client) + '</b>' : ''}.`;
+  return `
+    <div class="card edit-banner">
+      ${text}
+      <div class="grid2" style="margin-top:10px">
+        <button class="btn primary" data-action="continueDraft">Continuar</button>
+        <button class="btn danger" data-action="discardDraft">Descartar</button>
+      </div>
+    </div>`;
+}
+
+function editBanner() {
+  const d = state.draft;
+  return d.id
+    ? `<div class="card edit-banner">✏️ Estás editando la cotización <b>folio ${d.number}</b>.</div>`
+    : '';
+}
+
+/* ---------- Estimate (profit) ---------- */
+function renderEstimate() {
+  const d = state.draft;
+  const items = d.items.map((it, i) => {
+    const pctMode = it.mode === '%';
+    return `
+    <div class="card">
+      <div class="item-head">
+        <span class="item-num">Artículo ${i + 1}</span>
+        <button class="del-btn" data-action="delItem" data-i="${i}">Quitar</button>
+      </div>
+      <label>Descripción</label>
+      <textarea data-scope="item" data-i="${i}" data-f="desc" rows="2" placeholder="Polines seco seleccionado">${esc(it.desc)}</textarea>
+      <div class="grid2">
+        <div><label>Cantidad</label><input data-scope="item" data-i="${i}" data-f="qty" value="${esc(it.qty)}" inputmode="decimal" placeholder="0"></div>
+        <div><label>Mi costo (c/u)</label><input data-scope="item" data-i="${i}" data-f="cost" value="${esc(it.cost)}" inputmode="decimal" placeholder="0.00"></div>
+      </div>
+      <label>${pctMode ? '% de ganancia' : 'Precio de venta (c/u)'}</label>
+      <div class="mode-row">
+        <div class="seg">
+          <button class="${pctMode ? '' : 'on'}" data-action="setMode" data-i="${i}" data-mode="$">$</button>
+          <button class="${pctMode ? 'on' : ''}" data-action="setMode" data-i="${i}" data-mode="%">%</button>
+        </div>
+        ${pctMode
+          ? `<input data-scope="item" data-i="${i}" data-f="pct" value="${esc(it.pct)}" inputmode="decimal" placeholder="2">`
+          : `<input data-scope="item" data-i="${i}" data-f="price" value="${esc(it.price)}" inputmode="decimal" placeholder="0.00">`}
+      </div>
+      <div class="hint" id="lpr-${i}">${pctMode ? 'Precio de venta: ' + money(num(it.price)) + ' c/u' : ''}</div>
+      <div class="row" style="margin-top:8px">
+        <span class="muted">Ganancia</span>
+        <span id="lp-${i}" class="${lineProfitClass(it)}">${lineProfitText(it)}</span>
+      </div>
+    </div>`;
+  }).join('');
+
+  const t = calc(d.items);
+  return `
+    ${topbar('Estimar utilidad', `<button class="icon-btn" data-action="newDraft" style="font-size:15px">Nueva</button>`)}
+    ${editBanner()}
+    <div class="card">
+      <label style="margin-top:0">Aplicar % de ganancia a todos</label>
+      <div class="mode-row">
+        <input id="applyPct" inputmode="decimal" placeholder="2">
+        <button class="btn" data-action="applyPctAll" style="width:auto">Aplicar</button>
+      </div>
+      <div class="hint">Precio = costo × (1 + %). Ejemplo: costo $100 con 2% → $102.00</div>
+    </div>
+    ${items}
+    <button class="btn" data-action="addItem">+ Agregar artículo</button>
+    <div class="section-title">Resumen</div>
+    <div class="card">
+      <div class="row"><span>Venta sin IVA</span><span id="t-sub">${money(t.sub)}</span></div>
+      <div class="row"><span>IVA 16%</span><span id="t-iva">${money(t.iva)}</span></div>
+      <div class="row total"><span>Venta con IVA</span><span id="t-total">${money(t.total)}</span></div>
+    </div>
+    <div class="grid2">
+      <div class="metric"><div class="l">Mi costo total</div><div class="v" id="t-cost">${money(t.cost)}</div></div>
+      <div class="metric"><div class="l">Ganancia</div><div class="v ${t.profit < 0 ? 'neg' : 'pos'}" id="t-profit">${money(t.profit)}</div></div>
+      <div class="metric" style="grid-column:1/-1"><div class="l">% de ganancia (sobre costo)</div><div class="v" id="t-margin">${t.markup.toFixed(1)}%</div></div>
+    </div>
+    <div class="btn-stack">
+      <button class="big-btn primary" data-action="go" data-to="quote" style="justify-content:center;margin-top:14px">Convertir a cotización →</button>
+    </div>
+  `;
+}
+
+/* ---------- Quote ---------- */
+function renderQuote() {
+  const d = state.draft;
+  const badge = d.number ? `<span class="badge">Folio ${d.number}</span>` : `<span class="badge">Nueva</span>`;
+  const field = (f, label, ph = '', type = 'text') => `
+    <label>${label}</label>
+    <input type="${type}" data-scope="draft" data-f="${f}" value="${esc(d[f])}" placeholder="${ph}">`;
+
+  const items = d.items.map((it, i) => `
+    <div class="card">
+      <div class="item-head">
+        <span class="item-num">Artículo ${i + 1}</span>
+        <button class="del-btn" data-action="delItem" data-i="${i}">Quitar</button>
+      </div>
+      <label>Descripción</label>
+      <textarea data-scope="item" data-i="${i}" data-f="desc" rows="2" placeholder="Triplay pino 1 cara">${esc(it.desc)}</textarea>
+      <label>Medidas</label>
+      <textarea data-scope="item" data-i="${i}" data-f="measures" rows="2" placeholder="15mm, 122cm x 2.44m">${esc(it.measures)}</textarea>
+      <div class="grid2">
+        <div><label>Cantidad</label><input data-scope="item" data-i="${i}" data-f="qty" value="${esc(it.qty)}" inputmode="decimal" placeholder="0"></div>
+        <div><label>Precio unitario</label><input data-scope="item" data-i="${i}" data-f="price" value="${esc(it.price)}" inputmode="decimal" placeholder="0.00"></div>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <span class="muted">Subtotal</span><b id="ln-${i}">${money(lineTotal(it))}</b>
+      </div>
+    </div>`).join('');
+
+  const t = calc(d.items);
+  return `
+    ${topbar('Cotización', badge)}
+    ${editBanner()}
+    <div class="card">
+      ${field('client', 'Cliente', 'Estacionamientos Bosques de las Lomas')}
+      ${field('attn', 'Atención', 'Armando Bonilla')}
+      ${field('site', 'Obra', 'Bosques de la Reforma No. 239')}
+      ${field('address', 'Dirección')}
+      ${field('email', 'Correo', 'cliente@correo.com', 'email')}
+      ${field('date', 'Fecha', '', 'date')}
+    </div>
+    <div class="section-title">Artículos</div>
+    ${items}
+    <button class="btn" data-action="addItem">+ Agregar artículo</button>
+    <div class="card" style="margin-top:14px">
+      <div class="row"><span>Subtotal</span><span id="t-sub">${money(t.sub)}</span></div>
+      <div class="row"><span>IVA 16%</span><span id="t-iva">${money(t.iva)}</span></div>
+      <div class="row total"><span>Total</span><span id="t-total">${money(t.total)}</span></div>
+      <div class="muted" id="t-profit-line" style="margin-top:6px">${profitLine(t)}</div>
+    </div>
+    <button class="big-btn primary" data-action="sharePdf" style="justify-content:center">📤 Compartir PDF</button>
+    ${d.id ? `
+    <div class="grid2">
+      <button class="btn" data-action="saveQuote">Guardar cambios</button>
+      <button class="btn" data-action="saveAsNew">Guardar como nueva</button>
+    </div>
+    <button class="btn" data-action="viewPdf" style="margin-top:8px">Ver PDF</button>` : `
+    <div class="grid2">
+      <button class="btn" data-action="viewPdf">Ver PDF</button>
+      <button class="btn" data-action="saveQuote">Guardar</button>
+    </div>`}
+    <button class="btn danger" data-action="newDraft" style="margin-top:8px">Empezar una nueva</button>
+  `;
+}
+
+function profitLine(t) {
+  return t.hasCost ? `Ganancia estimada: ${money(t.profit)} (${t.markup.toFixed(1)}% sobre costo)` : '';
+}
+
+/* ---------- History ---------- */
+function renderHistory() {
+  const list = [...state.quotes].sort((a, b) => (b.number || 0) - (a.number || 0));
+  const body = list.length ? list.map((q) => `
+    <div class="card">
+      <div class="row" style="font-size:16px">
+        <b>Folio ${q.number} · ${esc(q.client || 'Sin cliente')}</b>
+      </div>
+      <div class="row"><span class="muted">${shortDate(q.date)}</span><b>${money(calc(q.items).total)}</b></div>
+      <div class="grid2" style="margin-top:8px">
+        <button class="btn small" data-action="openQuote" data-id="${q.id}">Abrir</button>
+        <button class="btn small" data-action="shareSaved" data-id="${q.id}">Compartir</button>
+        <button class="btn small" data-action="dupQuote" data-id="${q.id}">Duplicar</button>
+        <button class="btn small danger" data-action="delQuote" data-id="${q.id}">Eliminar</button>
+      </div>
+    </div>`).join('') : `
+    <div class="empty">Aquí aparecerán las cotizaciones que guardes.</div>
+    <button class="big-btn primary" data-action="start" data-to="quote" style="justify-content:center">Crear cotización</button>`;
+  return topbar('Mis cotizaciones') + body;
+}
+
+/* ---------- Settings ---------- */
+function renderSettings() {
+  const s = state.settings;
+  const hintHtml = (hint) => hint ? `<div class="hint">${hint}</div>` : '';
+  const field = (f, label, ph = '', mode = 'text', hint = '') => `
+    <label>${label}</label>
+    <input data-scope="settings" data-f="${f}" value="${esc(s[f])}" placeholder="${ph}" inputmode="${mode}">
+    ${hintHtml(hint)}`;
+  const area = (f, label, hint = '') => `
+    <label>${label}</label>
+    <textarea data-scope="settings" data-f="${f}" rows="2">${esc(s[f])}</textarea>
+    ${hintHtml(hint)}`;
+  const logo = `<img class="logo-img" src="${currentLogo()}" alt="Logo">`;
+  const restoreLogo = s.logo
+    ? `<button class="btn small" data-action="removeLogo">Usar logo original</button>`
+    : '';
+
+  return `
+    ${topbar('Configuración', '<span class="badge" id="save-status">Guardado ✓</span>')}
+    <div class="muted" style="margin-bottom:8px">Todo se guarda solo mientras escribes, en este teléfono. No hay que apretar ningún botón.</div>
+
+    <div class="section-title">Empresa</div>
+    <div class="card">
+      ${logo}
+      <div class="grid2">
+        <button class="btn small" data-action="pickLogo">Cambiar logo</button>
+        ${restoreLogo}
+      </div>
+      <input type="file" id="logoInput" accept="image/*" hidden>
+      ${field('companyName', 'Nombre de la empresa', 'Grupo MT Fortes Hermanos, S.A. de C.V.')}
+      ${field('signer', 'Quién firma la cotización', 'Victor Manuel Fortes Lucio')}
+      ${field('city', 'Ciudad', 'CDMX', 'text', 'Aparece junto a la fecha: "CDMX a 10 de octubre del 2026"')}
+    </div>
+
+    <div class="section-title">Textos de la cotización</div>
+    <div class="card">
+      ${area('intro', 'Introducción', 'Texto que va antes de la tabla de artículos')}
+      ${field('deliveryTime', 'Tiempo de entrega')}
+      ${field('paymentTerms', 'Condiciones de pago')}
+      ${area('closing', 'Cierre', 'Texto que va antes de la firma')}
+      ${field('nextNumber', 'Siguiente folio', '1001', 'numeric', 'Se llena solo con cada cotización. Normalmente no se cambia.')}
+    </div>
+
+    <div class="section-title">Datos bancarios</div>
+    <div class="card">
+      ${field('bankName', 'Banco', 'Scotiabank')}
+      ${field('account', 'Número de cuenta', '', 'numeric')}
+      ${field('branch', 'Sucursal', '', 'numeric')}
+      ${field('clabe', 'CLABE interbancaria', '', 'numeric', '18 dígitos')}
+      ${field('accountName', 'Titular de la cuenta', 'Grupo MT Fortes Hermanos, S.A. de C.V.', 'text', 'A nombre de quién está la cuenta (a quién le depositan)')}
+    </div>
+
+    <div class="section-title">Respaldo</div>
+    <div class="card">
+      <div class="muted">Esto no es para guardar: tus datos ya se guardan solos. Es una copia de seguridad por si cambias de teléfono (por ejemplo, mándala por WhatsApp a tu hijo).</div>
+      <div class="btn-stack">
+        <button class="btn" data-action="exportBackup">Descargar respaldo</button>
+        <button class="btn" data-action="pickBackup">Restaurar respaldo</button>
+      </div>
+      <input type="file" id="backupInput" accept="application/json,.json" hidden>
+    </div>
+
+    <div class="section-title">Zona de cuidado</div>
+    <div class="card">
+      <div class="muted">Borra todas las cotizaciones y la configuración de este app, solo en este teléfono. No afecta nada más.</div>
+      <button class="btn danger" data-action="resetApp" style="margin-top:8px">Borrar datos de este app</button>
+    </div>
+  `;
+}
+
+/* Live-update totals without re-rendering (keeps keyboard focus) */
+function updateTotals() {
+  const d = state.draft;
+  d.items.forEach((it, i) => {
+    const ln = document.getElementById(`ln-${i}`);
+    if (ln) ln.textContent = money(lineTotal(it));
+    const lp = document.getElementById(`lp-${i}`);
+    if (lp) {
+      lp.textContent = lineProfitText(it);
+      lp.className = lineProfitClass(it);
+    }
+    const lpr = document.getElementById(`lpr-${i}`);
+    if (lpr && it.mode === '%') lpr.textContent = `Precio de venta: ${money(num(it.price))} c/u`;
+  });
+  const t = calc(d.items);
+  const set = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
+  set('t-sub', money(t.sub));
+  set('t-iva', money(t.iva));
+  set('t-total', money(t.total));
+  set('t-cost', money(t.cost));
+  set('t-margin', `${t.markup.toFixed(1)}%`);
+  set('t-profit-line', profitLine(t));
+  const tp = document.getElementById('t-profit');
+  if (tp) { tp.textContent = money(t.profit); tp.className = `v ${t.profit < 0 ? 'neg' : 'pos'}`; }
+}
+
+/* =========================================================
+   QUOTES: save / open / duplicate / delete
+   ========================================================= */
+function validateDraft() {
+  const d = state.draft;
+  if (!d.client.trim()) { toast('Escribe el nombre del cliente'); return false; }
+  if (!filledItems(d.items).length) { toast('Agrega al menos un artículo'); return false; }
+  return true;
+}
+
+/* Synchronous part runs first (assigns number), then saving happens in the background.
+   This matters on iPhone: the share menu must open right after the tap. */
+function commitDraft() {
+  const d = state.draft;
+  const now = new Date().toISOString();
+  if (!d.id) { d.id = uid(); d.createdAt = now; }
+  if (!d.number) {
+    d.number = Math.max(1, Math.floor(num(state.settings.nextNumber)) || 1);
+    state.settings.nextNumber = d.number + 1;
+    kvSet('settings', state.settings).catch(console.error);
+  }
+  d.updatedAt = now;
+  const saved = clone(d);
+  const idx = state.quotes.findIndex((q) => q.id === d.id);
+  if (idx >= 0) state.quotes[idx] = saved; else state.quotes.push(saved);
+  return Promise.all([quotePut(saved), kvSet('draft', d)]).catch((e) => {
+    console.error(e);
+    toast('No se pudo guardar');
+  });
+}
+
+function startNewDraft() {
+  if (hasPendingWork() && !confirm('¿Empezar una nueva? Lo que no hayas guardado se perderá.')) return;
+  resetDraft();
+  render();
+}
+
+function resetDraft() {
+  state.draft = newDraft();
+  kvSet('draft', state.draft).catch(console.error);
+}
+
+/* From home: continue unfinished work, otherwise start blank */
+function startWork(screen) {
+  if (!hasPendingWork()) resetDraft();
+  go(screen);
+}
+
+/* Before replacing the current draft (open / duplicate) */
+function okToReplaceDraft() {
+  return !hasPendingWork() || confirm('Tienes una cotización sin terminar. Si continúas, se perderá. ¿Continuar?');
+}
+
+/* Back button: ask only when an edited saved quote has unsaved changes */
+async function goBack() {
+  if ((state.screen === 'quote' || state.screen === 'estimate') && hasUnsavedEdits()) {
+    const n = state.draft.number;
+    const choice = await askChoice('Cambios sin guardar', `Hiciste cambios a la cotización folio ${n}.`, [
+      { label: 'Guardar cambios', cls: 'primary', value: 'save' },
+      { label: 'Descartar cambios', cls: 'danger', value: 'discard' },
+      { label: 'Seguir editando', value: 'stay' }
+    ]);
+    if (choice === 'stay') return;
+    if (choice === 'save') {
+      if (!validateDraft()) return;
+      await commitDraft();
+      toast(`Cambios guardados (folio ${n})`);
+    }
+    if (choice === 'discard') resetDraft();
+  }
+  go('home');
+}
+
+/* Simple dialog with several buttons; resolves with the chosen value */
+function askChoice(title, message, options) {
+  return new Promise((resolve) => {
+    const root = document.getElementById('modal');
+    root.innerHTML = `
+      <div class="modal-bg"><div class="modal">
+        <h3>${esc(title)}</h3>
+        <p>${esc(message)}</p>
+        ${options.map((o, i) => `<button class="btn ${o.cls || ''}" data-choice="${i}">${esc(o.label)}</button>`).join('')}
+      </div></div>`;
+    root.onclick = (e) => {
+      const b = e.target.closest('[data-choice]');
+      if (!b) return;
+      root.innerHTML = '';
+      root.onclick = null;
+      resolve(options[Number(b.dataset.choice)].value);
+    };
+  });
+}
+
+/* =========================================================
+   PDF
+   ========================================================= */
+function pdfFileName(q) {
+  const client = (q.client || 'cliente')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40);
+  return `Cotizacion-${q.number}-${client}.pdf`;
+}
+
+function buildPdf(q) {
+  const s = state.settings;
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'pt', format: 'letter' });
+  const W = 612, H = 792, M = 48;
+  let y = 60;
+
+  const ensure = (h) => { if (y + h > H - 50) { doc.addPage(); y = 60; } };
+
+  // Logo (top right)
+  const logo = currentLogo();
+  let logoBottom = 36;
+  try {
+    const p = doc.getImageProperties(logo);
+    const scale = Math.min(110 / p.width, 76 / p.height);
+    const w = p.width * scale, h = p.height * scale;
+    doc.addImage(logo, logoFormat(logo), W - M - w, 36, w, h);
+    logoBottom = 36 + h;
+  } catch (e) { console.error(e); }
+
+  // Header (left): company name and title
+  doc.setFont('helvetica', 'bold').setFontSize(16);
+  const nameLines = doc.splitTextToSize(s.companyName || '', W - M * 2 - 130);
+  doc.text(nameLines, M, y);
+  y += 20 * nameLines.length + 8;
+  doc.setFontSize(14);
+  doc.text('COTIZACIÓN', M, y);
+
+  // Date and folio (right, below the logo)
+  let ry = logoBottom + 18;
+  doc.setFont('helvetica', 'normal').setFontSize(10);
+  doc.text(`${s.city || 'CDMX'} a ${longDate(q.date)}`, W - M, ry, { align: 'right' });
+  ry += 14;
+  doc.text(`Folio: ${q.number}`, W - M, ry, { align: 'right' });
+  y = Math.max(y, ry) + 28;
+
+  // Client block
+  doc.setFont('helvetica', 'bold').setFontSize(11);
+  doc.text(q.client || '', M, y);
+  y += 16;
+  const info = [['Atención:', q.attn], ['Obra:', q.site], ['Dirección:', q.address], ['Correo:', q.email]];
+  doc.setFontSize(10);
+  for (const [label, value] of info) {
+    if (!String(value || '').trim()) continue;
+    const lines = doc.splitTextToSize(value, W - M * 2 - 70);
+    doc.setFont('helvetica', 'bold').text(label, M, y);
+    doc.setFont('helvetica', 'normal').text(lines, M + 70, y);
+    y += 14 * lines.length;
+  }
+  y += 10;
+
+  doc.setFont('helvetica', 'bold').text('P r e s e n t e', M, y);
+  y += 14;
+  doc.setFont('helvetica', 'normal').setFontSize(9);
+  const intro = doc.splitTextToSize(s.intro || '', W - M * 2);
+  doc.text(intro, M, y);
+  y += 12 * intro.length + 4;
+
+  // Items table
+  const rows = filledItems(q.items).map((it) => [
+    qtyFmt.format(num(it.qty)),
+    it.desc,
+    it.measures,
+    money(num(it.price)),
+    money(lineTotal(it))
+  ]);
+  doc.autoTable({
+    startY: y,
+    head: [['Cantidad', 'Artículo', 'Medidas', 'Precio', 'Subtotal']],
+    body: rows,
+    theme: 'grid',
+    margin: { left: M, right: M },
+    styles: { font: 'helvetica', fontSize: 9, cellPadding: 6, valign: 'top', lineColor: [200, 200, 200] },
+    headStyles: { fillColor: [122, 74, 36], textColor: 255, fontStyle: 'bold' },
+    columnStyles: {
+      0: { halign: 'center', cellWidth: 58 },
+      2: { cellWidth: 95 },
+      3: { halign: 'right', cellWidth: 75 },
+      4: { halign: 'right', cellWidth: 85 }
+    }
+  });
+  y = doc.lastAutoTable.finalY + 16;
+
+  // Totals
+  const t = calc(q.items);
+  ensure(60);
+  const labelX = W - M - 100;
+  doc.setFontSize(10);
+  [['Subtotal', t.sub, false], ['IVA 16%', t.iva, false], ['Total', t.total, true]].forEach(([label, val, bold]) => {
+    doc.setFont('helvetica', bold ? 'bold' : 'normal').setFontSize(bold ? 12 : 10);
+    doc.text(label, labelX, y, { align: 'right' });
+    doc.text(money(val), W - M, y, { align: 'right' });
+    y += bold ? 18 : 15;
+  });
+  y += 14;
+
+  // Terms and bank details
+  const terms = [
+    ['Tiempo de entrega:', s.deliveryTime],
+    ['Condiciones de pago:', s.paymentTerms],
+    [`Cuenta ${s.bankName || ''}:`.replace(' :', ':'), s.account],
+    ['Sucursal:', s.branch],
+    ['CLABE interbancaria:', s.clabe],
+    ['Referencia:', String(q.number)],
+    ['Nombre:', s.accountName]
+  ].filter(([, v]) => String(v || '').trim());
+  ensure(16 * terms.length + 10);
+  doc.setFontSize(10);
+  for (const [label, value] of terms) {
+    doc.setFont('helvetica', 'normal').text(label, M + 40, y);
+    doc.setFont('helvetica', 'bold').text(String(value), M + 180, y);
+    y += 16;
+  }
+  y += 24;
+
+  // Closing and signature
+  ensure(80);
+  doc.setFont('helvetica', 'italic').setFontSize(10);
+  doc.text(doc.splitTextToSize(s.closing || '', 230), M, y);
+  const sigX = W - M - 120;
+  doc.setFont('helvetica', 'normal');
+  doc.text('A t e n t a m e n t e', sigX, y, { align: 'center' });
+  y += 34;
+  doc.setDrawColor(60).line(sigX - 110, y, sigX + 110, y);
+  y += 14;
+  if (s.signer) { doc.text(s.signer, sigX, y, { align: 'center' }); y += 14; }
+  if (s.companyName) doc.text(doc.splitTextToSize(s.companyName, 220), sigX, y, { align: 'center' });
+
+  return doc;
+}
+
+function downloadBlob(blob, name) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+}
+
+function pdfReady() {
+  if (window.jspdf && window.jspdf.jsPDF) return true;
+  toast('Se necesita internet para generar el PDF');
+  return false;
+}
+
+async function shareFile(blob, name, type) {
+  const file = new File([blob], name, { type });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file] });
+    } catch (e) {
+      if (e.name !== 'AbortError') { console.error(e); toast('No se pudo compartir'); }
+    }
+  } else {
+    downloadBlob(blob, name);
+  }
+}
+
+function sharePdf(q) {
+  if (!pdfReady()) return;
+  const blob = buildPdf(q).output('blob');
+  shareFile(blob, pdfFileName(q), 'application/pdf');
+}
+
+function viewPdf(q) {
+  if (!pdfReady()) return;
+  const blob = buildPdf(q).output('blob');
+  const url = URL.createObjectURL(blob);
+  const w = window.open(url, '_blank');
+  if (!w) downloadBlob(blob, pdfFileName(q));
+}
+
+/* =========================================================
+   LOGO AND BACKUP
+   ========================================================= */
+function loadLogo(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    const img = new Image();
+    img.onload = () => {
+      const max = 400;
+      const scale = Math.min(1, max / Math.max(img.width, img.height));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      state.settings.logo = canvas.toDataURL('image/png');
+      kvSet('settings', state.settings).catch(console.error);
+      render();
+      toast('Logo guardado');
+    };
+    img.onerror = () => toast('No se pudo leer la imagen');
+    img.src = reader.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function exportBackup() {
+  const data = {
+    app: 'cotizador-gmt',
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    settings: state.settings,
+    quotes: state.quotes
+  };
+  const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+  shareFile(blob, `respaldo-gmt-${todayISO()}.json`, 'application/json');
+}
+
+function importBackup(file) {
+  const reader = new FileReader();
+  reader.onload = async () => {
+    try {
+      const data = JSON.parse(reader.result);
+      if (data.app !== 'cotizador-gmt' || !Array.isArray(data.quotes)) throw new Error('bad file');
+      if (!confirm(`Este respaldo tiene ${data.quotes.length} cotizaciones. Se combinarán con las que ya tienes y se reemplazará la configuración. ¿Continuar?`)) return;
+      const keepNext = Math.max(num(state.settings.nextNumber), num(data.settings?.nextNumber));
+      state.settings = { ...DEFAULT_SETTINGS, ...(data.settings || {}), nextNumber: keepNext || 1 };
+      await kvSet('settings', state.settings);
+      for (const q of data.quotes) await quotePut(q);
+      state.quotes = await quotesGetAll();
+      render();
+      toast('Respaldo restaurado');
+    } catch (e) {
+      console.error(e);
+      toast('Ese archivo no es un respaldo válido');
+    }
+  };
+  reader.readAsText(file);
+}
+
+/* Deletes ONLY this app's own database (cotizador-gmt), then reloads */
+function resetApp() {
+  if (!confirm('¿Borrar TODAS las cotizaciones y la configuración de este app? No se puede deshacer.')) return;
+  if (!confirm('¿Seguro? Te recomendamos descargar un respaldo antes.')) return;
+  db.close();
+  const req = indexedDB.deleteDatabase(DB_NAME);
+  req.onsuccess = req.onerror = req.onblocked = () => location.reload();
+}
+
+/* =========================================================
+   EVENTS (delegated)
+   ========================================================= */
+app.addEventListener('click', (e) => {
+  const el = e.target.closest('[data-action]');
+  if (!el) return;
+  const { action, to, i, id } = el.dataset;
+  const d = state.draft;
+  const findQuote = () => state.quotes.find((q) => q.id === id);
+
+  switch (action) {
+    case 'go':
+      go(to);
+      break;
+    case 'back':
+      goBack();
+      break;
+    case 'start':
+      startWork(to);
+      break;
+    case 'continueDraft':
+      go('quote');
+      break;
+    case 'discardDraft':
+      if (!confirm('¿Descartar lo que no se ha guardado?')) return;
+      resetDraft();
+      render();
+      break;
+    case 'saveAsNew':
+      if (!validateDraft()) return;
+      Object.assign(d, { id: null, number: null, createdAt: null });
+      commitDraft().then(() => toast(`Guardada como nueva: folio ${d.number}`));
+      render();
+      break;
+    case 'newDraft':
+      startNewDraft();
+      break;
+    case 'addItem':
+      d.items.push(newItem());
+      saveDraftSoon();
+      render();
+      window.scrollTo(0, document.body.scrollHeight);
+      break;
+    case 'delItem':
+      if (d.items.length === 1) d.items = [newItem()];
+      else d.items.splice(Number(i), 1);
+      saveDraftSoon();
+      render(true);
+      break;
+    case 'setMode': {
+      const it = d.items[Number(i)];
+      const mode = el.dataset.mode;
+      if ((it.mode || '$') === mode) break;
+      if (mode === '%') {
+        const c = num(it.cost);
+        it.pct = c && num(it.price) ? String(round2(((num(it.price) - c) / c) * 100)) : '';
+      }
+      it.mode = mode;
+      saveDraftSoon();
+      render(true);
+      break;
+    }
+    case 'applyPctAll': {
+      const v = document.getElementById('applyPct').value.trim();
+      if (v === '' || !isFinite(parseFloat(v))) { toast('Escribe un porcentaje'); return; }
+      let n = 0;
+      d.items.forEach((it) => {
+        if (num(it.cost) > 0) { it.mode = '%'; it.pct = v; applyPct(it); n++; }
+      });
+      if (!n) { toast('Primero escribe el costo de los artículos'); return; }
+      saveDraftSoon();
+      render(true);
+      toast(`${v}% aplicado a ${n} artículo(s)`);
+      break;
+    }
+    case 'saveQuote': {
+      if (!validateDraft()) return;
+      const wasSaved = !!d.id;
+      commitDraft().then(() => toast(wasSaved ? `Cambios guardados (folio ${d.number})` : `Cotización folio ${d.number} guardada`));
+      render();
+      break;
+    }
+    case 'sharePdf':
+      if (!validateDraft()) return;
+      commitDraft();
+      sharePdf(d);
+      render();
+      break;
+    case 'viewPdf':
+      if (!validateDraft()) return;
+      commitDraft();
+      viewPdf(d);
+      render();
+      break;
+    case 'openQuote':
+      if (d.id === id) { go('quote'); break; }
+      if (!okToReplaceDraft()) return;
+      state.draft = clone(findQuote());
+      kvSet('draft', state.draft).catch(console.error);
+      go('quote');
+      break;
+    case 'shareSaved':
+      sharePdf(findQuote());
+      break;
+    case 'dupQuote': {
+      if (!okToReplaceDraft()) return;
+      const copy = clone(findQuote());
+      Object.assign(copy, { id: null, number: null, date: todayISO(), createdAt: null, updatedAt: null });
+      state.draft = copy;
+      kvSet('draft', state.draft).catch(console.error);
+      go('quote');
+      toast('Copia lista: cambia lo que necesites');
+      break;
+    }
+    case 'delQuote': {
+      const q = findQuote();
+      if (!confirm(`¿Eliminar la cotización folio ${q.number}? No se puede deshacer.`)) return;
+      state.quotes = state.quotes.filter((x) => x.id !== id);
+      quoteDelete(id).catch(console.error);
+      if (state.draft.id === id) { state.draft.id = null; state.draft.number = null; }
+      render();
+      break;
+    }
+    case 'pickLogo':
+      document.getElementById('logoInput').click();
+      break;
+    case 'removeLogo':
+      state.settings.logo = '';
+      kvSet('settings', state.settings).catch(console.error);
+      render();
+      break;
+    case 'exportBackup':
+      exportBackup();
+      break;
+    case 'pickBackup':
+      document.getElementById('backupInput').click();
+      break;
+    case 'resetApp':
+      resetApp();
+      break;
+  }
+});
+
+app.addEventListener('input', (e) => {
+  const el = e.target;
+  const f = el.dataset.f;
+  if (!f) return;
+  const scope = el.dataset.scope;
+  if (scope === 'item') {
+    const it = state.draft.items[Number(el.dataset.i)];
+    it[f] = el.value;
+    if (f === 'pct' || f === 'cost') applyPct(it);
+    if (f === 'price' && it.mode === '%') it.mode = '$';
+    updateTotals();
+    saveDraftSoon();
+  } else if (scope === 'draft') {
+    state.draft[f] = el.value;
+    saveDraftSoon();
+  } else if (scope === 'settings') {
+    state.settings[f] = f === 'nextNumber' ? Math.floor(num(el.value)) || 1 : el.value;
+    setSaveStatus('Guardando…');
+    saveSettingsSoon();
+  }
+});
+
+app.addEventListener('change', (e) => {
+  const file = e.target.files && e.target.files[0];
+  if (!file) return;
+  if (e.target.id === 'logoInput') loadLogo(file);
+  if (e.target.id === 'backupInput') importBackup(file);
+  e.target.value = '';
+});
+
+/* =========================================================
+   START
+   ========================================================= */
+(async function init() {
+  try {
+    db = await openDB();
+    const saved = await kvGet('settings');
+    state.settings = { ...DEFAULT_SETTINGS, ...(saved || {}) };
+    state.draft = (await kvGet('draft')) || newDraft();
+    state.quotes = (await quotesGetAll()) || [];
+    if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+  } catch (e) {
+    console.error(e);
+    state.draft = newDraft();
+    toast('No se pudo abrir la base de datos');
+  }
+  render();
+})();
+</script>
+</body>
+</html>
