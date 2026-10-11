@@ -175,6 +175,7 @@ const DEFAULT_SETTINGS = {
   account: '',
   branch: '',
   clabe: '',
+  reference: '',
   accountName: '',
   nextNumber: 1001,
   logo: ''
@@ -231,7 +232,7 @@ function newItem() {
 function newDraft() {
   return {
     id: null, number: null, date: todayISO(),
-    client: '', attn: '', site: '', address: '', email: '',
+    client: '', attn: '', site: '', address: '', email: '', notes: '',
     items: [newItem()],
     createdAt: null, updatedAt: null
   };
@@ -321,8 +322,8 @@ function draftHasContent(d) {
 
 /* The parts of a quote that the user edits (used to detect unsaved changes) */
 function quoteContent(q) {
-  const { date, client, attn, site, address, email, items } = q;
-  return JSON.stringify({ date, client, attn, site, address, email, items });
+  const { date, client, attn, site, address, email, notes, items } = q;
+  return JSON.stringify({ date, client, attn, site, address, email, notes: notes || '', items });
 }
 
 /* True when a saved quote is open and has changes that were not saved */
@@ -416,7 +417,6 @@ function topbar(title, extra = '') {
 function renderHome() {
   const s = state.settings;
   const logo = `<img class="logo-img" src="${currentLogo()}" alt="Logo">`;
-  const firstName = (s.signer || '').trim().split(' ')[0];
   const setupHint = !s.companyName.trim() ? `
     <div class="card" style="background:var(--wood-light);border-color:var(--wood-light)">
       <b>Primer paso:</b> llena los datos de tu empresa en <b>Configuración</b> para que aparezcan en tus cotizaciones.
@@ -426,12 +426,12 @@ function renderHome() {
     <div class="card hero">
       ${logo}
       <h2>${esc(s.companyName || 'Cotizador')}</h2>
-      <div class="muted" style="margin-top:4px">${firstName ? 'Hola, ' + esc(firstName) : 'Bienvenido'}</div>
+      <div class="muted" style="margin-top:4px">Bienvenido</div>
     </div>
     ${setupHint}
     ${continueCard()}
     <button class="big-btn" data-action="start" data-to="estimate"><span class="ic">🧮</span>Estimar utilidad de pedido</button>
-    <button class="big-btn primary" data-action="start" data-to="quote"><span class="ic">📄</span>Generar cotización</button>
+    <button class="big-btn" data-action="start" data-to="quote"><span class="ic">📄</span>Generar cotización</button>
     <button class="big-btn" data-action="go" data-to="history"><span class="ic">🗂️</span>Mis cotizaciones</button>
     <button class="big-btn" data-action="go" data-to="settings"><span class="ic">⚙️</span>Configuración</button>
   `;
@@ -472,7 +472,7 @@ function renderEstimate() {
         <button class="del-btn" data-action="delItem" data-i="${i}">Quitar</button>
       </div>
       <label>Descripción</label>
-      <textarea data-scope="item" data-i="${i}" data-f="desc" rows="2" placeholder="Polines seco seleccionado">${esc(it.desc)}</textarea>
+      <textarea data-scope="item" data-i="${i}" data-f="desc" rows="2" placeholder="Material, producto o servicio, etc.">${esc(it.desc)}</textarea>
       <div class="grid2">
         <div><label>Cantidad</label><input data-scope="item" data-i="${i}" data-f="qty" value="${esc(it.qty)}" inputmode="decimal" placeholder="0"></div>
         <div><label>Mi costo (c/u)</label><input data-scope="item" data-i="${i}" data-f="cost" value="${esc(it.cost)}" inputmode="decimal" placeholder="0.00"></div>
@@ -541,9 +541,9 @@ function renderQuote() {
         <button class="del-btn" data-action="delItem" data-i="${i}">Quitar</button>
       </div>
       <label>Descripción</label>
-      <textarea data-scope="item" data-i="${i}" data-f="desc" rows="2" placeholder="Triplay pino 1 cara">${esc(it.desc)}</textarea>
+      <textarea data-scope="item" data-i="${i}" data-f="desc" rows="2" placeholder="Material, producto o servicio, etc.">${esc(it.desc)}</textarea>
       <label>Medidas</label>
-      <textarea data-scope="item" data-i="${i}" data-f="measures" rows="2" placeholder="15mm, 122cm x 2.44m">${esc(it.measures)}</textarea>
+      <textarea data-scope="item" data-i="${i}" data-f="measures" rows="2" placeholder="Grosor, ancho, largo, especificaciones, etc. (opcional)">${esc(it.measures)}</textarea>
       <div class="grid2">
         <div><label>Cantidad</label><input data-scope="item" data-i="${i}" data-f="qty" value="${esc(it.qty)}" inputmode="decimal" placeholder="0"></div>
         <div><label>Precio unitario</label><input data-scope="item" data-i="${i}" data-f="price" value="${esc(it.price)}" inputmode="decimal" placeholder="0.00"></div>
@@ -558,12 +558,15 @@ function renderQuote() {
     ${topbar('Cotización', badge)}
     ${editBanner()}
     <div class="card">
-      ${field('client', 'Cliente', 'Estacionamientos Bosques de las Lomas')}
-      ${field('attn', 'Atención', 'Armando Bonilla')}
-      ${field('site', 'Obra', 'Bosques de la Reforma No. 239')}
-      ${field('address', 'Dirección')}
-      ${field('email', 'Correo', 'cliente@correo.com', 'email')}
+      ${field('client', 'Cliente', 'Nombre del cliente o empresa')}
+      ${field('attn', 'Atención', 'Persona de contacto')}
+      ${field('site', 'Obra', 'Nombre o ubicación de la obra')}
+      ${field('address', 'Dirección', 'Calle, número, colonia, ciudad etc...')}
+      ${field('email', 'Correo', 'Correo del cliente', 'email')}
       ${field('date', 'Fecha', '', 'date')}
+      <label>Notas (opcional)</label>
+      <textarea data-scope="draft" data-f="notes" rows="2" placeholder="Escribe una nota (opcional)">${esc(d.notes)}</textarea>
+      <div class="hint">Aparece en el PDF arriba de la tabla. Si lo dejas vacío, no aparece.</div>
     </div>
     <div class="section-title">Artículos</div>
     ${items}
@@ -663,6 +666,7 @@ function renderSettings() {
       ${field('account', 'Número de cuenta', '', 'numeric')}
       ${field('branch', 'Sucursal', '', 'numeric')}
       ${field('clabe', 'CLABE interbancaria', '', 'numeric', '18 dígitos')}
+      ${field('reference', 'Referencia bancaria', '18', 'text', 'Número de referencia que pide el banco para el depósito. No es el folio.')}
       ${field('accountName', 'Titular de la cuenta', 'Grupo MT Fortes Hermanos, S.A. de C.V.', 'text', 'A nombre de quién está la cuenta (a quién le depositan)')}
     </div>
 
@@ -720,6 +724,17 @@ function validateDraft() {
   return true;
 }
 
+/* Company, text and bank details stored with each saved quote,
+   so an old quote's PDF always comes out exactly as it was sent */
+const SNAPSHOT_KEYS = ['companyName', 'signer', 'city', 'intro', 'deliveryTime', 'paymentTerms', 'closing',
+  'bankName', 'account', 'branch', 'clabe', 'reference', 'accountName', 'logo'];
+
+function takeSnapshot() {
+  const snap = {};
+  for (const k of SNAPSHOT_KEYS) snap[k] = state.settings[k] ?? '';
+  return snap;
+}
+
 /* Synchronous part runs first (assigns number), then saving happens in the background.
    This matters on iPhone: the share menu must open right after the tap. */
 function commitDraft() {
@@ -732,6 +747,7 @@ function commitDraft() {
     kvSet('settings', state.settings).catch(console.error);
   }
   d.updatedAt = now;
+  d.snap = takeSnapshot();
   const saved = clone(d);
   const idx = state.quotes.findIndex((q) => q.id === d.id);
   if (idx >= 0) state.quotes[idx] = saved; else state.quotes.push(saved);
@@ -814,7 +830,7 @@ function pdfFileName(q) {
 }
 
 function buildPdf(q) {
-  const s = state.settings;
+  const s = { ...state.settings, ...(q.snap || {}) };
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ unit: 'pt', format: 'letter' });
   const W = 612, H = 792, M = 48;
@@ -823,7 +839,7 @@ function buildPdf(q) {
   const ensure = (h) => { if (y + h > H - 50) { doc.addPage(); y = 60; } };
 
   // Logo (top right)
-  const logo = currentLogo();
+  const logo = s.logo || DEFAULT_LOGO;
   let logoBottom = 36;
   try {
     const p = doc.getImageProperties(logo);
@@ -871,6 +887,15 @@ function buildPdf(q) {
   doc.text(intro, M, y);
   y += 12 * intro.length + 4;
 
+  // Notes (only when filled)
+  if (String(q.notes || '').trim()) {
+    y += 4;
+    const noteLines = doc.splitTextToSize(String(q.notes).trim(), W - M * 2 - 46);
+    doc.setFont('helvetica', 'bold').text('Notas:', M, y);
+    doc.setFont('helvetica', 'normal').text(noteLines, M + 46, y);
+    y += 12 * noteLines.length + 6;
+  }
+
   // Items table
   const rows = filledItems(q.items).map((it) => [
     qtyFmt.format(num(it.qty)),
@@ -913,10 +938,11 @@ function buildPdf(q) {
   const terms = [
     ['Tiempo de entrega:', s.deliveryTime],
     ['Condiciones de pago:', s.paymentTerms],
-    [`Cuenta ${s.bankName || ''}:`.replace(' :', ':'), s.account],
+    ['Banco:', s.bankName],
+    ['Número de cuenta:', s.account],
     ['Sucursal:', s.branch],
-    ['CLABE interbancaria:', s.clabe],
-    ['Referencia:', String(q.number)],
+    ['CLABE Interbancaria:', s.clabe],
+    ['Referencia:', s.reference],
     ['Nombre:', s.accountName]
   ].filter(([, v]) => String(v || '').trim());
   ensure(16 * terms.length + 10);
