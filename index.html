@@ -233,6 +233,7 @@ function newDraft() {
   return {
     id: null, number: null, date: todayISO(),
     client: '', attn: '', site: '', address: '', email: '', notes: '',
+    disc: '', discMode: '%', discReason: '',
     items: [newItem()],
     createdAt: null, updatedAt: null
   };
@@ -323,7 +324,8 @@ function draftHasContent(d) {
 /* The parts of a quote that the user edits (used to detect unsaved changes) */
 function quoteContent(q) {
   const { date, client, attn, site, address, email, notes, items } = q;
-  return JSON.stringify({ date, client, attn, site, address, email, notes: notes || '', items });
+  const disc = q.disc || '', discMode = q.discMode || '%', discReason = q.discReason || '';
+  return JSON.stringify({ date, client, attn, site, address, email, notes: notes || '', disc, discMode, discReason, items });
 }
 
 /* True when a saved quote is open and has changes that were not saved */
@@ -348,7 +350,8 @@ function hasPendingWork() {
 function lineTotal(it) { return num(it.qty) * num(it.price); }
 function lineCost(it) { return num(it.qty) * num(it.cost); }
 
-function calc(items) {
+/* Discount is applied to the subtotal, BEFORE IVA. q is the quote (optional). */
+function calc(items, q) {
   let sub = 0, cost = 0, hasCost = false;
   for (const it of items) {
     sub += lineTotal(it);
@@ -356,12 +359,57 @@ function calc(items) {
     if (num(it.cost) > 0) hasCost = true;
   }
   sub = round2(sub);
-  const iva = round2(sub * IVA_RATE);
-  const total = round2(sub + iva);
-  const profit = round2(sub - cost);
-  const margin = sub ? (profit / sub) * 100 : 0;
+  let disc = 0;
+  if (q) {
+    const v = num(q.disc);
+    disc = q.discMode === '$' ? v : (sub * v) / 100;
+    disc = round2(Math.min(Math.max(disc, 0), sub));
+  }
+  const net = round2(sub - disc);
+  const iva = round2(net * IVA_RATE);
+  const total = round2(net + iva);
+  const profit = round2(net - cost);
+  const margin = net ? (profit / net) * 100 : 0;
   const markup = cost ? (profit / cost) * 100 : 0;
-  return { sub, iva, total, cost: round2(cost), profit, margin, markup, hasCost };
+  return { sub, disc, net, iva, total, cost: round2(cost), profit, margin, markup, hasCost };
+}
+
+/* "Descuento 3% (Pronto pago)" or "Descuento (Pronto pago)" for a fixed amount */
+function discLabel(q) {
+  const pct = q.discMode === '$' ? '' : ` ${qtyFmt.format(num(q.disc))}%`;
+  const reason = String(q.discReason || '').trim();
+  return `Descuento${pct}${reason ? ` (${reason})` : ''}`;
+}
+
+/* Discount input card, shared by Estimar utilidad and Cotización */
+function discountCard(d) {
+  const fixed = d.discMode === '$';
+  return `
+    <div class="section-title">Descuento (opcional)</div>
+    <div class="card">
+      <label style="margin-top:0">${fixed ? 'Descuento en pesos' : 'Descuento %'}</label>
+      <div class="mode-row">
+        <div class="seg">
+          <button class="${fixed ? '' : 'on'}" data-action="setDiscMode" data-mode="%">%</button>
+          <button class="${fixed ? 'on' : ''}" data-action="setDiscMode" data-mode="$">$</button>
+        </div>
+        <input data-scope="draft" data-f="disc" value="${esc(d.disc)}" inputmode="decimal" placeholder="0">
+      </div>
+      <label>Motivo del descuento</label>
+      <input data-scope="draft" data-f="discReason" value="${esc(d.discReason)}" placeholder="Por ejemplo: pronto pago">
+      <div class="hint">Se aplica al subtotal, antes del IVA. Si lo dejas vacío, no aparece en el PDF.</div>
+    </div>`;
+}
+
+/* Subtotal → (discount → subtotal con descuento) → IVA → total */
+function totalsRows(d, t, subLabel, totalLabel) {
+  const hide = t.disc ? '' : 'display:none';
+  return `
+      <div class="row"><span>${subLabel}</span><span id="t-sub">${money(t.sub)}</span></div>
+      <div class="row" id="t-disc-row" style="${hide}"><span id="t-disc-label">${esc(discLabel(d))}</span><span id="t-disc">-${money(t.disc)}</span></div>
+      <div class="row" id="t-net-row" style="${hide}"><span>Subtotal con descuento</span><span id="t-net">${money(t.net)}</span></div>
+      <div class="row"><span>IVA 16%</span><span id="t-iva">${money(t.iva)}</span></div>
+      <div class="row total"><span>${totalLabel}</span><span id="t-total">${money(t.total)}</span></div>`;
 }
 
 /* "% de ganancia" = over cost (markup): price = cost × (1 + % / 100) */
@@ -495,9 +543,9 @@ function renderEstimate() {
     </div>`;
   }).join('');
 
-  const t = calc(d.items);
+  const t = calc(d.items, d);
   return `
-    ${topbar('Estimar utilidad', `<button class="icon-btn" data-action="newDraft" style="font-size:15px">Nueva</button>`)}
+    ${topbar('Estimar utilidad',`<button class="icon-btn" data-action="newDraft" style="font-size:15px">Nueva</button>`)}
     ${editBanner()}
     <div class="card">
       <label style="margin-top:0">Aplicar % de ganancia a todos</label>
@@ -509,11 +557,10 @@ function renderEstimate() {
     </div>
     ${items}
     <button class="btn" data-action="addItem">+ Agregar artículo</button>
+    ${discountCard(d)}
     <div class="section-title">Resumen</div>
     <div class="card">
-      <div class="row"><span>Venta sin IVA</span><span id="t-sub">${money(t.sub)}</span></div>
-      <div class="row"><span>IVA 16%</span><span id="t-iva">${money(t.iva)}</span></div>
-      <div class="row total"><span>Venta con IVA</span><span id="t-total">${money(t.total)}</span></div>
+      ${totalsRows(d, t, 'Venta sin IVA', 'Venta con IVA')}
     </div>
     <div class="grid2">
       <div class="metric"><div class="l">Mi costo total</div><div class="v" id="t-cost">${money(t.cost)}</div></div>
@@ -553,7 +600,7 @@ function renderQuote() {
       </div>
     </div>`).join('');
 
-  const t = calc(d.items);
+  const t = calc(d.items, d);
   return `
     ${topbar('Cotización', badge)}
     ${editBanner()}
@@ -571,10 +618,9 @@ function renderQuote() {
     <div class="section-title">Artículos</div>
     ${items}
     <button class="btn" data-action="addItem">+ Agregar artículo</button>
+    ${discountCard(d)}
     <div class="card" style="margin-top:14px">
-      <div class="row"><span>Subtotal</span><span id="t-sub">${money(t.sub)}</span></div>
-      <div class="row"><span>IVA 16%</span><span id="t-iva">${money(t.iva)}</span></div>
-      <div class="row total"><span>Total</span><span id="t-total">${money(t.total)}</span></div>
+      ${totalsRows(d, t, 'Subtotal', 'Total')}
       <div class="muted" id="t-profit-line" style="margin-top:6px">${profitLine(t)}</div>
     </div>
     <button class="big-btn primary" data-action="sharePdf" style="justify-content:center">📤 Compartir PDF</button>
@@ -604,7 +650,7 @@ function renderHistory() {
       <div class="row" style="font-size:16px">
         <b>Folio ${q.number} · ${esc(q.client || 'Sin cliente')}</b>
       </div>
-      <div class="row"><span class="muted">${shortDate(q.date)}</span><b>${money(calc(q.items).total)}</b></div>
+      <div class="row"><span class="muted">${shortDate(q.date)}</span><b>${money(calc(q.items, q).total)}</b></div>
       <div class="grid2" style="margin-top:8px">
         <button class="btn small" data-action="openQuote" data-id="${q.id}">Abrir</button>
         <button class="btn small" data-action="shareSaved" data-id="${q.id}">Compartir</button>
@@ -702,9 +748,16 @@ function updateTotals() {
     const lpr = document.getElementById(`lpr-${i}`);
     if (lpr && it.mode === '%') lpr.textContent = `Precio de venta: ${money(num(it.price))} c/u`;
   });
-  const t = calc(d.items);
+  const t = calc(d.items, d);
   const set = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
   set('t-sub', money(t.sub));
+  set('t-disc-label', discLabel(d));
+  set('t-disc', `-${money(t.disc)}`);
+  set('t-net', money(t.net));
+  for (const id of ['t-disc-row', 't-net-row']) {
+    const row = document.getElementById(id);
+    if (row) row.style.display = t.disc ? '' : 'none';
+  }
   set('t-iva', money(t.iva));
   set('t-total', money(t.total));
   set('t-cost', money(t.cost));
@@ -922,14 +975,20 @@ function buildPdf(q) {
   y = doc.lastAutoTable.finalY + 16;
 
   // Totals
-  const t = calc(q.items);
-  ensure(60);
+  const t = calc(q.items, q);
+  ensure(95);
   const labelX = W - M - 100;
   doc.setFontSize(10);
-  [['Subtotal', t.sub, false], ['IVA 16%', t.iva, false], ['Total', t.total, true]].forEach(([label, val, bold]) => {
+  const totalRows = [['Subtotal', money(t.sub), false]];
+  if (t.disc) {
+    totalRows.push([discLabel(q), `-${money(t.disc)}`, false]);
+    totalRows.push(['Subtotal con descuento', money(t.net), false]);
+  }
+  totalRows.push(['IVA 16%', money(t.iva), false], ['Total', money(t.total), true]);
+  totalRows.forEach(([label, val, bold]) => {
     doc.setFont('helvetica', bold ? 'bold' : 'normal').setFontSize(bold ? 12 : 10);
     doc.text(label, labelX, y, { align: 'right' });
-    doc.text(money(val), W - M, y, { align: 'right' });
+    doc.text(val, W - M, y, { align: 'right' });
     y += bold ? 18 : 15;
   });
   y += 14;
@@ -1131,6 +1190,20 @@ app.addEventListener('click', (e) => {
       saveDraftSoon();
       render(true);
       break;
+    case 'setDiscMode': {
+      const mode = el.dataset.mode;
+      const cur = d.discMode || '%';
+      if (cur === mode) break;
+      const sub = calc(d.items).sub;
+      const v = num(d.disc);
+      if (String(d.disc).trim() !== '' && sub) {
+        d.disc = String(mode === '$' ? round2((sub * v) / 100) : round2((v / sub) * 100));
+      }
+      d.discMode = mode;
+      saveDraftSoon();
+      render(true);
+      break;
+    }
     case 'setMode': {
       const it = d.items[Number(i)];
       const mode = el.dataset.mode;
@@ -1239,6 +1312,7 @@ app.addEventListener('input', (e) => {
     saveDraftSoon();
   } else if (scope === 'draft') {
     state.draft[f] = el.value;
+    if (f === 'disc' || f === 'discReason') updateTotals();
     saveDraftSoon();
   } else if (scope === 'settings') {
     state.settings[f] = f === 'nextNumber' ? Math.floor(num(el.value)) || 1 : el.value;
